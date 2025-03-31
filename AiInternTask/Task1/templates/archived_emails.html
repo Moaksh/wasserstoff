@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Archived Emails - AI Email Assistant{% endblock %}
+
+{% block page_title %}Archived Emails{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">Archived Emails</h2>
+    <div class="join">
+        <button class="btn join-item btn-sm"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn join-item btn-sm"><i class="fas fa-filter"></i></button>
+    </div>
+</div>
+
+{% if emails %}
+    <div class="grid gap-4">
+        {% for email in emails %}
+            <div class="card email-item hover:bg-base-200 cursor-pointer shadow-sm border border-base-200" data-email-id="{{ email.id }}">
+                <div class="card-body p-4">
+                    <div class="flex justify-between items-start">
+                        <h3 class="card-title text-lg">{{ email.subject }}</h3>
+                        <span class="badge badge-ghost">{{ email.date }}</span>
+                    </div>
+                    <p class="email-meta"><strong>From:</strong> {{ email.from }}</p>
+                    <p class="mt-2 text-base-content/80">{{ email.snippet }}...</p>
+                    <div class="card-actions justify-end mt-2">
+                        <button class="btn btn-ghost btn-sm email-action-btn" data-action="unarchive" data-email-id="{{ email.id }}"><i class="fas fa-inbox"></i> Move to Inbox</button>
+                        <button class="btn btn-ghost btn-sm email-action-btn" data-action="delete" data-email-id="{{ email.id }}"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination Controls -->
+    <div class="flex justify-center mt-6">
+        <div class="btn-group">
+            <button class="btn btn-sm pagination-btn" data-page="{{ (current_page|default(1))-1 }}" {% if (current_page|default(1)) <= 1 %}disabled{% endif %}>«</button>
+            <button class="btn btn-sm">Page {{ current_page|default(1) }}</button>
+            <button class="btn btn-sm pagination-btn" data-page="{{ (current_page|default(1))+1 }}">»</button>
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-info shadow-lg">
+        <div>
+            <i class="fas fa-info-circle"></i>
+            <span>No archived emails found.</span>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

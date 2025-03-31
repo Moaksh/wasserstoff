@@ -220,6 +220,100 @@ def api_email_detail(email_id):
 
     return jsonify(email_data)
 
+@app.route('/archived_emails')
+def archived_emails():
+    if 'credentials' not in session:
+        return redirect(url_for('login'))
+
+    from src.auth.web_auth import credentials_from_session
+    from src.email_client.gmail_client import get_gmail_service, list_messages, get_message_detail
+
+    creds = credentials_from_session(session['credentials'])
+    if not creds:
+        return redirect(url_for('login'))
+
+    service = get_gmail_service(creds)
+    if not service:
+        flash('Could not connect to Gmail service', 'error')
+        return redirect(url_for('dashboard'))
+
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    # Query for archived emails (has ARCHIVE label)
+    query = 'label:archive'
+    messages_refs = list_messages(service, max_results=100)
+    total_messages = len(messages_refs) if messages_refs else 0
+    total_pages = (total_messages + per_page - 1) // per_page
+
+    current_page_messages = messages_refs[offset:offset+per_page] if messages_refs else []
+    emails_data = []
+
+    if current_page_messages:
+        for msg_ref in current_page_messages:
+            msg_id = msg_ref['id']
+            msg_detail = get_message_detail(service, msg_id, format='metadata', metadata_headers=['subject', 'from', 'date'])
+            if msg_detail:
+                headers = msg_detail.get('payload', {}).get('headers', [])
+                email_info = {
+                    'id': msg_id,
+                    'snippet': msg_detail.get('snippet', ''),
+                    'subject': next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'N/A'),
+                    'from': next((h['value'] for h in headers if h['name'].lower() == 'from'), 'N/A'),
+                    'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A')
+                }
+                emails_data.append(email_info)
+
+    return render_template('archived_emails.html', emails=emails_data, current_page=page, total_pages=total_pages)
+
+@app.route('/deleted_emails')
+def deleted_emails():
+    if 'credentials' not in session:
+        return redirect(url_for('login'))
+
+    from src.auth.web_auth import credentials_from_session
+    from src.email_client.gmail_client import get_gmail_service, list_messages, get_message_detail
+
+    creds = credentials_from_session(session['credentials'])
+    if not creds:
+        return redirect(url_for('login'))
+
+    service = get_gmail_service(creds)
+    if not service:
+        flash('Could not connect to Gmail service', 'error')
+        return redirect(url_for('dashboard'))
+
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    # Query for deleted emails (in TRASH)
+    query = 'in:trash'
+    messages_refs = list_messages(service, max_results=100)
+    total_messages = len(messages_refs) if messages_refs else 0
+    total_pages = (total_messages + per_page - 1) // per_page
+
+    current_page_messages = messages_refs[offset:offset+per_page] if messages_refs else []
+    emails_data = []
+
+    if current_page_messages:
+        for msg_ref in current_page_messages:
+            msg_id = msg_ref['id']
+            msg_detail = get_message_detail(service, msg_id, format='metadata', metadata_headers=['subject', 'from', 'date'])
+            if msg_detail:
+                headers = msg_detail.get('payload', {}).get('headers', [])
+                email_info = {
+                    'id': msg_id,
+                    'snippet': msg_detail.get('snippet', ''),
+                    'subject': next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'N/A'),
+                    'from': next((h['value'] for h in headers if h['name'].lower() == 'from'), 'N/A'),
+                    'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A')
+                }
+                emails_data.append(email_info)
+
+    return render_template('deleted_emails.html', emails=emails_data, current_page=page, total_pages=total_pages)
+
 @app.route('/api/email/<email_id>/<action>', methods=['POST'])
 def api_email_action(email_id, action):
     if 'credentials' not in session:
@@ -236,48 +330,68 @@ def api_email_action(email_id, action):
     if not service:
         return jsonify({'error': 'Could not connect to Gmail service'}), 500
 
-    if action == 'delete':
-        try:
+    try:
+        if action == 'delete':
             service.users().messages().trash(userId='me', id=email_id).execute()
             return jsonify({'success': True, 'message': 'Email moved to trash'})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
 
-    elif action == 'archive':
-        try:
+        elif action == 'archive':
             service.users().messages().modify(
                 userId='me',
                 id=email_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
             return jsonify({'success': True, 'message': 'Email archived'})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
 
-    elif action == 'reply':
-        msg_detail = get_message_detail(service, email_id, format='metadata', 
-                                      metadata_headers=['subject', 'from', 'to', 'message-id'])
-        if not msg_detail:
-            return jsonify({'error': 'Email not found'}), 404
+        elif action == 'unarchive':
+            service.users().messages().modify(
+                userId='me',
+                id=email_id,
+                body={'addLabelIds': ['INBOX']}
+            ).execute()
+            return jsonify({'success': True, 'message': 'Email moved to inbox'})
 
-        headers = msg_detail.get('payload', {}).get('headers', [])
+        elif action == 'restore':
+            service.users().messages().untrash(userId='me', id=email_id).execute()
+            return jsonify({'success': True, 'message': 'Email restored'})
 
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
-        if not subject.lower().startswith('re:'):
-            subject = f"Re: {subject}"
+        elif action == 'permanent-delete':
+            service.users().messages().delete(userId='me', id=email_id).execute()
+            return jsonify({'success': True, 'message': 'Email permanently deleted'})
 
-        from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
+        elif action == 'reply':
+            msg_detail = get_message_detail(service, email_id, format='metadata', 
+                                          metadata_headers=['subject', 'from', 'to', 'message-id'])
+            if not msg_detail:
+                return jsonify({'error': 'Email not found'}), 404
 
-        reply_data = {
-            'to': from_email,
-            'subject': subject,
-            'in_reply_to': next((h['value'] for h in headers if h['name'].lower() == 'message-id'), '')
-        }
+            headers = msg_detail.get('payload', {}).get('headers', [])
+            if not headers:
+                return jsonify({'error': 'Email headers not found'}), 404
 
-        return jsonify({'success': True, 'replyData': reply_data})
+            subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
+            if not subject.lower().startswith('re:'):
+                subject = f"Re: {subject}"
 
-    else:
-        return jsonify({'error': 'Invalid action'}), 400
+            from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
+            if not from_email:
+                return jsonify({'error': 'Sender email not found'}), 404
+
+            message_id = next((h['value'] for h in headers if h['name'].lower() == 'message-id'), '')
+
+            reply_data = {
+                'to': from_email,
+                'subject': subject,
+                'in_reply_to': message_id
+            }
+
+            return jsonify({'success': True, 'replyData': reply_data})
+
+        else:
+            return jsonify({'error': 'Invalid action'}), 400
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/email/<email_id>/reply', methods=['POST'])
 def api_send_reply(email_id):

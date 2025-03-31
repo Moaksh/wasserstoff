@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Email Assistant{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="drawer lg:drawer-open">
+        <input id="my-drawer" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content flex flex-col">
+            <!-- Navbar -->
+            <div class="navbar bg-base-100 shadow-md z-10">
+                <div class="flex-none lg:hidden">
+                    <label for="my-drawer" class="btn btn-square btn-ghost">
+                        <i class="fas fa-bars"></i>
+                    </label>
+                </div>
+                <div class="flex-1">
+                    <span class="text-xl font-bold px-4">{% block page_title %}Email Dashboard{% endblock %}</span>
+                </div>
+                <div class="flex-none gap-2">
+                    <div class="form-control">
+                        <div class="input-group">
+                            <input type="text" placeholder="Search emails..." class="input input-bordered input-sm" />
+                            <button class="btn btn-square btn-sm">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-ghost btn-circle" onclick="toggleTheme()">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <div class="dropdown dropdown-end">
+                        <label tabindex="0" class="btn btn-ghost btn-circle avatar">
+                            <div class="w-10 rounded-full bg-primary text-primary-content grid place-items-center">
+                                <span>{{ user_initial|default('U') }}</span>
+                            </div>
+                        </label>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                            <li><a href="#">Profile</a></li>
+                            <li><a href="#">Settings</a></li>
+                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page content -->
+            <div class="p-4 lg:p-6">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="drawer-side">
+            <label for="my-drawer" class="drawer-overlay"></label>
+            <aside class="bg-base-200 w-64 h-full">
+                <div class="p-4 bg-primary text-primary-content">
+                    <h2 class="text-xl font-bold">AI Email Assistant</h2>
+                </div>
+                <ul class="menu p-4 text-base-content">
+                    <li class="menu-title">Mail</li>
+                    <li><a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fas fa-inbox mr-2"></i> Inbox</a></li>
+                    <li><a><i class="fas fa-paper-plane mr-2"></i> Sent</a></li>
+                    <li><a><i class="fas fa-star mr-2"></i> Starred</a></li>
+                    <li><a href="{{url_for('archived_emails')}}" class="{% if request.endpoint == 'archived_emails' %}active{% endif %}" ><i class="fas fa-exclamation-circle mr-2"></i> Archived</a></li>
+                    <li><a href="{{ url_for('deleted_emails') }}" class="{% if request.endpoint == 'deleted_emails' %}active{% endif %}"><i class="fas fa-trash mr-2"></i> Trash</a></li>
+                    <li class="menu-title mt-4">Labels</li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Important</a></li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Work</a></li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Personal</a></li>
+                    
+                    <!-- AI Assistant Section -->
+                    <li class="menu-title mt-4">AI Assistant</li>
+                    <li><a><i class="fas fa-robot mr-2"></i> Email Summary</a></li>
+                    <li><a><i class="fas fa-reply-all mr-2"></i> Draft Replies</a></li>
+                    <li><a><i class="fas fa-calendar-alt mr-2"></i> Schedule Meeting</a></li>
+                </ul>
+            </aside>
+        </div>
+    </div>
+    
+    {% block modals %}{% endblock %}
+    
+    <!-- Theme toggle script -->
+    <script>
+        function toggleTheme() {
+            const html = document.querySelector('html');
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            const themeIcon = document.querySelector('.btn-ghost.btn-circle i');
+            if (themeIcon) {
+                themeIcon.className = newTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.querySelector('html').setAttribute('data-theme', savedTheme);
+                const themeIcon = document.querySelector('.btn-ghost.btn-circle i');
+                if (themeIcon) {
+                    themeIcon.className = savedTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+                }
+            }
+        });
+    </script>
+    
+    <!-- Notification Container -->
+    <div id="notification_container" class="toast toast-end"></div>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
