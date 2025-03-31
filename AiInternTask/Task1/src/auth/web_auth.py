@@ -11,7 +11,10 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email', # Get user email
     'https://www.googleapis.com/auth/userinfo.profile', # Get user profile info
     'openid', # Standard OpenID scope
-    'https://www.googleapis.com/auth/gmail.readonly' # Add other scopes like gmail.modify, calendar later
+    'https://www.googleapis.com/auth/gmail.readonly', # Read Gmail messages
+    'https://www.googleapis.com/auth/gmail.modify', # Modify Gmail messages (archive, mark as read)
+    'https://www.googleapis.com/auth/gmail.labels', # Manage labels
+    'https://www.googleapis.com/auth/gmail.compose' # Send emails and manage drafts
 ]
 # The redirect URI must exactly match one configured in Google Cloud Console
 # Best practice: construct it dynamically if your app host/port can change

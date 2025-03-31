@@ -49,35 +49,31 @@ def oauth2callback():
 
 @app.route('/dashboard')
 def dashboard():
-    // Check if user is authenticated
     if 'credentials' not in session:
         return redirect(url_for('index'))
-    
-    // Retrieve credentials from session
+
+    from src.auth.web_auth import credentials_from_session
+    from src.email_client.gmail_client import get_gmail_service, list_messages, get_message_detail
+
     creds = credentials_from_session(session['credentials'])
     if not creds:
         session.pop('credentials', None)
         return redirect(url_for('login'))
-    
-    // Connect to Gmail service
+
     service = get_gmail_service(creds)
     if not service:
         return "Could not connect to Gmail service.", 500
-    
-    // Pagination setup
+
     page = request.args.get('page', 1, type=int)
     per_page = 10
     offset = (page - 1) * per_page
-    
-    // Fetch messages
+
     messages_refs = list_messages(service, max_results=100)
     total_messages = len(messages_refs) if messages_refs else 0
     total_pages = (total_messages + per_page - 1) // per_page
-    
-    // Get current page messages
+
     current_page_messages = messages_refs[offset:offset+per_page] if messages_refs else []
-    
-    // Prepare email data for rendering
+
     emails_data = []
     if current_page_messages:
         for msg_ref in current_page_messages:
@@ -93,8 +89,7 @@ def dashboard():
                     'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A')
                 }
                 emails_data.append(email_info)
-    
-    // Render dashboard template
+
     return render_template('dashboard.html', emails=emails_data, current_page=page, total_pages=total_pages)
 
 @app.route('/api/emails')

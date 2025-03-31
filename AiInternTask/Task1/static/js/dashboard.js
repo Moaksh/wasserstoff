@@ -390,40 +390,83 @@ function handleEmailAction(action, emailId) {
         return;
     }
     
+    // Show loading notification
+    showNotification(`Processing ${action} action...`, 'info');
+    
     // Send action to server
     fetch(`/api/email/${emailId}/${action}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-        }
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({})
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
+    .then(async response => {
+        let data;
+        try {
+            data = await response.json();
+        } catch (e) {
+            throw new Error('Invalid server response');
         }
-        return response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || data.message || `Server returned ${response.status}: ${response.statusText}`);
+        }
+        return data;
     })
     .then(data => {
+        console.log(`${action} response:`, data);
+        
         // Handle success based on action
         if (action === 'delete' || action === 'archive') {
             // Remove email from list if deleted or archived
             const emailElement = document.querySelector(`.email-item[data-email-id="${emailId}"]`);
             if (emailElement) {
                 emailElement.remove();
+                // Show success message
+                showNotification(data.message || `Email ${action === 'delete' ? 'deleted' : 'archived'} successfully`, 'success');
+                
+                // Close modal if open
+                const threadModal = document.getElementById('email_thread_modal');
+                if (threadModal && threadModal.open) {
+                    threadModal.close();
+                }
+            } else {
+                throw new Error(`Could not find email element with ID: ${emailId}`);
             }
-            
-            // Show success message
-            showNotification(`Email ${action === 'delete' ? 'deleted' : 'archived'} successfully`, 'success');
         } else if (action === 'reply') {
             // Open compose modal with reply details
-            openComposeModal(data.replyData);
+            if (data.replyData) {
+                openComposeModal(data.replyData);
+                showNotification('Reply form prepared successfully', 'success');
+            } else {
+                throw new Error('Reply data not received from server');
+            }
         }
     })
     .catch(error => {
         console.error(`Error performing ${action}:`, error);
-        showNotification(`Failed to ${action} email. Please try again.`, 'error');
-    });
-}
+        let errorMessage = error.message;
+        
+        // Handle different types of errors
+        if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('Invalid server response')) {
+            errorMessage = 'Server returned an invalid response. Please try again.';
+        } else if (error.message.includes('Could not find email element')) {
+            errorMessage = 'Error updating email list. Please refresh the page.';
+        }
+        
+        showNotification(`Failed to ${action} email: ${errorMessage}`, 'error');
+        
+        // Refresh the email list if we encounter an error during delete/archive
+        if ((action === 'delete' || action === 'archive') && error.message.includes('Could not find email element')) {
+            loadEmailPage(1);
+        }
+    })}
+
 
 /**
  * Sends a reply to an email
@@ -437,6 +480,9 @@ function sendReply(emailId) {
         return;
     }
     
+    // Show loading notification
+    showNotification('Sending reply...', 'info');
+    
     // Send reply to server
     fetch(`/api/email/${emailId}/reply`, {
         method: 'POST',
@@ -447,22 +493,34 @@ function sendReply(emailId) {
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
         return response.json();
     })
     .then(data => {
-        showNotification('Reply sent successfully', 'success');
+        console.log('Reply response:', data); // Debug logging
         
-        // Close the modal
-        const threadModal = document.getElementById('email_thread_modal');
-        if (threadModal) {
-            threadModal.close();
+        if (data.success) {
+            showNotification('Reply sent successfully', 'success');
+            
+            // Clear the textarea
+            const textarea = document.querySelector('.email-reply textarea');
+            if (textarea) {
+                textarea.value = '';
+            }
+            
+            // Close the modal
+            const threadModal = document.getElementById('email_thread_modal');
+            if (threadModal) {
+                threadModal.close();
+            }
+        } else {
+            throw new Error(data.error || 'Unknown error occurred');
         }
     })
     .catch(error => {
         console.error('Error sending reply:', error);
-        showNotification('Failed to send reply. Please try again.', 'error');
+        showNotification(`Failed to send reply: ${error.message}`, 'error');
     });
 }
 
@@ -538,7 +596,7 @@ function attachEmailEventListeners() {
             e.stopPropagation(); // Prevent opening the thread
             
             const action = button.getAttribute('data-action');
-            const emailId = button.getAttribute('data-email-id');
+            const emailId = button.closest('.email-item').getAttribute('data-email-id');
             
             if (action && emailId) {
                 handleEmailAction(action, emailId);
