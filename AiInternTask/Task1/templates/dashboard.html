@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - AI Email Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> <style>
+        body { font-family: sans-serif; }
+        .email-item { border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
+        .email-item h3 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .email-item p { margin: 2px 0; }
+        .email-meta { font-size: 0.8em; color: #555; }
+        .logout { float: right; }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('logout') }}" class="logout"><button>Logout</button></a>
+    <h1>Email Dashboard</h1>
+
+    {% if emails %}
+        <h2>Recent Emails:</h2>
+        {% for email in emails %}
+            <div class="email-item">
+                <h3>{{ email.subject }}</h3>
+                <p class="email-meta"><strong>From:</strong> {{ email.from }}</p>
+                <p class="email-meta"><strong>Date:</strong> {{ email.date }}</p>
+                <p>{{ email.snippet }}...</p>
+                </div>
+        {% endfor %}
+    {% else %}
+        <p>No emails found or unable to fetch emails.</p>
+    {% endif %}
+</body>
+</html>

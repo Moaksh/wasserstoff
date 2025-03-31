@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Email Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Optional: You can add custom configurations here if needed
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                googleBlue: '#4285F4',
+                googleBlueHover: '#357ae8',
+              }
+            }
+          }
+        }
+      </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 md:p-12 rounded-lg shadow-lg max-w-md w-full text-center">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6">
+            Login Required
+        </h1>
+        <p class="text-gray-600 mb-8 text-base md:text-lg">
+            Welcome! Please log in using your Google Account to allow the
+            AI Email Assistant to securely access and help manage your emails.
+        </p>
+
+        <a href="{{ url_for('login') }}"
+           class="inline-block px-6 py-3 bg-googleBlue text-white font-semibold rounded-md shadow-sm hover:bg-googleBlueHover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-googleBlue transition duration-150 ease-in-out">
+            Login with Google
+        </a>
+    </div>
+
+</body>
+</html>
