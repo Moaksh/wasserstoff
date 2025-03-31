@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --primary-color: #4a90e2;
+    --secondary-color: #34495e;
+    --background-color: #f5f6fa;
+    --text-color: #2c3e50;
+    --border-color: #dcdde1;
+}
+
+@layer components {
+    .dashboard-container {
+        @apply container mx-auto p-4;
+    }
+    
+    .email-item {
+        @apply border border-base-300 rounded-lg p-4 mb-4 bg-base-100 shadow-sm hover:shadow-md transition-shadow;
+    }
+    
+    .email-meta {
+        @apply text-sm text-base-content/70;
+    }
+}

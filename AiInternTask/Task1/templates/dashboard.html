@@ -1,33 +1,261 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - AI Email Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> <style>
-        body { font-family: sans-serif; }
-        .email-item { border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; border-radius: 5px; }
-        .email-item h3 { margin: 0 0 5px 0; font-size: 1.1em; }
-        .email-item p { margin: 2px 0; }
-        .email-meta { font-size: 0.8em; color: #555; }
-        .logout { float: right; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DaisyUI CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dashboard JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </head>
 <body>
-    <a href="{{ url_for('logout') }}" class="logout"><button>Logout</button></a>
-    <h1>Email Dashboard</h1>
-
-    {% if emails %}
-        <h2>Recent Emails:</h2>
-        {% for email in emails %}
-            <div class="email-item">
-                <h3>{{ email.subject }}</h3>
-                <p class="email-meta"><strong>From:</strong> {{ email.from }}</p>
-                <p class="email-meta"><strong>Date:</strong> {{ email.date }}</p>
-                <p>{{ email.snippet }}...</p>
+    <div class="drawer lg:drawer-open">
+        <input id="my-drawer" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content flex flex-col">
+            <!-- Navbar -->
+            <div class="navbar bg-base-100 shadow-md z-10">
+                <div class="flex-none lg:hidden">
+                    <label for="my-drawer" class="btn btn-square btn-ghost">
+                        <i class="fas fa-bars"></i>
+                    </label>
                 </div>
-        {% endfor %}
-    {% else %}
-        <p>No emails found or unable to fetch emails.</p>
-    {% endif %}
+                <div class="flex-1">
+                    <span class="text-xl font-bold px-4">Email Dashboard</span>
+                </div>
+                <div class="flex-none gap-2">
+                    <div class="form-control">
+                        <div class="input-group">
+                            <input type="text" placeholder="Search emails..." class="input input-bordered input-sm" />
+                            <button class="btn btn-square btn-sm">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-ghost btn-circle" onclick="toggleTheme()">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <div class="dropdown dropdown-end">
+                        <label tabindex="0" class="btn btn-ghost btn-circle avatar">
+                            <div class="w-10 rounded-full bg-primary text-primary-content grid place-items-center">
+                                <span>{{ user_initial|default('U') }}</span>
+                            </div>
+                        </label>
+                        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                            <li><a href="#">Profile</a></li>
+                            <li><a href="#">Settings</a></li>
+                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page content -->
+            <div class="p-4 lg:p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Inbox</h2>
+                    <div class="join">
+                        <button class="btn join-item btn-sm"><i class="fas fa-sync-alt"></i></button>
+                        <button class="btn join-item btn-sm"><i class="fas fa-filter"></i></button>
+                        <button class="btn btn-primary btn-sm ml-2"><i class="fas fa-pen mr-1"></i> Compose</button>
+                    </div>
+                </div>
+                
+                {% if emails %}
+                    <div class="grid gap-4">
+                        {% for email in emails %}
+                            <div class="card email-item hover:bg-base-200 cursor-pointer shadow-sm border border-base-200" data-email-id="{{ email.id }}">
+                                <div class="card-body p-4">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="card-title text-lg">{{ email.subject }}</h3>
+                                        <span class="badge badge-ghost">{{ email.date }}</span>
+                                    </div>
+                                    <p class="email-meta"><strong>From:</strong> {{ email.from }}</p>
+                                    <p class="mt-2 text-base-content/80">{{ email.snippet }}...</p>
+                                    <div class="card-actions justify-end mt-2">
+                                        <button class="btn btn-ghost btn-sm email-action-btn" data-action="reply" data-email-id="{{ email.id }}"><i class="fas fa-reply"></i> Reply</button>
+                                        <button class="btn btn-ghost btn-sm email-action-btn" data-action="archive" data-email-id="{{ email.id }}"><i class="fas fa-archive"></i> Archive</button>
+                                        <button class="btn btn-ghost btn-sm email-action-btn" data-action="delete" data-email-id="{{ email.id }}"><i class="fas fa-trash"></i> Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="flex justify-center mt-6">
+                        <div class="btn-group">
+                            <button class="btn btn-sm pagination-btn" data-page="{{ (current_page|default(1))-1 }}" {% if (current_page|default(1)) <= 1 %}disabled{% endif %}>«</button>
+                            <button class="btn btn-sm">Page {{ current_page|default(1) }}</button>
+                            <button class="btn btn-sm pagination-btn" data-page="{{ (current_page|default(1))+1 }}">»</button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info shadow-lg">
+                        <div>
+                            <i class="fas fa-info-circle"></i>
+                            <span>No emails found or unable to fetch emails.</span>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- AI Assistant Panel -->
+            <div class="card bg-base-100 shadow-md mt-6">
+                <div class="card-body">
+                    <h3 class="card-title text-lg"><i class="fas fa-robot mr-2"></i>AI Email Assistant</h3>
+                    <p class="text-base-content/80">Let AI help you manage your emails more efficiently.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                        <div class="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold"><i class="fas fa-magic mr-2"></i>Summarize Emails</h4>
+                                <p class="text-sm">Get quick summaries of long email threads</p>
+                            </div>
+                        </div>
+                        <div class="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold"><i class="fas fa-reply mr-2"></i>Smart Reply</h4>
+                                <p class="text-sm">Generate contextual reply suggestions</p>
+                            </div>
+                        </div>
+                        <div class="card bg-base-200 hover:bg-base-300 cursor-pointer transition-colors">
+                            <div class="card-body p-4">
+                                <h4 class="font-bold"><i class="fas fa-calendar-check mr-2"></i>Schedule Meetings</h4>
+                                <p class="text-sm">Detect meeting requests and suggest times</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="drawer-side">
+            <label for="my-drawer" class="drawer-overlay"></label>
+            <aside class="bg-base-200 w-64 h-full">
+                <div class="p-4 bg-primary text-primary-content">
+                    <h2 class="text-xl font-bold">AI Email Assistant</h2>
+                </div>
+                <ul class="menu p-4 text-base-content">
+                    <li class="menu-title">Mail</li>
+                    <li><a class="active"><i class="fas fa-inbox mr-2"></i> Inbox</a></li>
+                    <li><a><i class="fas fa-paper-plane mr-2"></i> Sent</a></li>
+                    <li><a><i class="fas fa-star mr-2"></i> Starred</a></li>
+                    <li><a><i class="fas fa-trash mr-2"></i> Trash</a></li>
+                    <li class="menu-title mt-4">Labels</li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Important</a></li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Work</a></li>
+                    <li><a><i class="fas fa-tag mr-2"></i> Personal</a></li>
+                    
+                    <!-- AI Assistant Section -->
+                    <li class="menu-title mt-4">AI Assistant</li>
+                    <li><a><i class="fas fa-robot mr-2"></i> Email Summary</a></li>
+                    <li><a><i class="fas fa-reply-all mr-2"></i> Draft Replies</a></li>
+                    <li><a><i class="fas fa-calendar-alt mr-2"></i> Schedule Meeting</a></li>
+                </ul>
+            </aside>
+        </div>
+    </div>
+    
+    <!-- Theme toggle script -->
+    <script>
+        // Simple theme toggle functionality
+        function toggleTheme() {
+            const html = document.querySelector('html');
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update icon based on theme
+            const themeIcon = document.querySelector('.btn-ghost.btn-circle i');
+            if (themeIcon) {
+                themeIcon.className = newTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        }
+        
+        // Load saved theme from localStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.querySelector('html').setAttribute('data-theme', savedTheme);
+                // Update icon based on saved theme
+                const themeIcon = document.querySelector('.btn-ghost.btn-circle i');
+                if (themeIcon) {
+                    themeIcon.className = savedTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+                }
+            }
+        });
+    </script>
+    
+    <!-- Compose Email Modal -->
+    <dialog id="compose_modal" class="modal">
+        <div class="modal-box w-11/12 max-w-3xl">
+            <h3 class="font-bold text-lg mb-4">Compose New Email</h3>
+            <form method="dialog" class="space-y-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">To:</span>
+                    </label>
+                    <input type="email" placeholder="recipient@example.com" class="input input-bordered" required />
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Subject:</span>
+                    </label>
+                    <input type="text" placeholder="Email subject" class="input input-bordered" required />
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Message:</span>
+                    </label>
+                    <textarea class="textarea textarea-bordered h-64" placeholder="Write your message here..."></textarea>
+                </div>
+                <div class="modal-action">
+                    <button type="button" class="btn btn-primary">Send</button>
+                    <button class="btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+    
+    <script>
+        // Compose email button functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const composeBtn = document.querySelector('.btn-primary.btn-sm');
+            const composeModal = document.getElementById('compose_modal');
+            
+            if (composeBtn && composeModal) {
+                composeBtn.addEventListener('click', () => {
+                    composeModal.showModal();
+                });
+            }
+        });
+    </script>
+    
+    <!-- Email Thread Modal -->
+    <dialog id="email_thread_modal" class="modal">
+        <div class="modal-box w-11/12 max-w-4xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">Email Thread</h3>
+                <form method="dialog">
+                    <button class="btn btn-sm btn-circle btn-ghost close-modal">✕</button>
+                </form>
+            </div>
+            <div id="email_thread_loading" class="py-4 flex justify-center">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+            <div id="email_thread_content" class="mt-2">
+                <!-- Email content will be loaded here -->
+            </div>
+        </div>
+    </dialog>
+    
+    <!-- Notification Container -->
+    <div id="notification_container" class="toast toast-end"></div>
 </body>
 </html>
