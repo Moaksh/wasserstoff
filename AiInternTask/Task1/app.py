@@ -2,6 +2,8 @@ import os
 import base64
 from flask import Flask, render_template, redirect, url_for, session, request, jsonify
 from dotenv import load_dotenv
+from database.gmail_integration import GmailDBIntegration
+from llm.email_understanding import EmailUnderstanding
 
 load_dotenv()
 
@@ -64,10 +66,18 @@ def dashboard():
     if not service:
         return "Could not connect to Gmail service.", 500
 
+    # Initialize database integration
+    gmail_db = GmailDBIntegration()
+    
+    # No longer syncing emails during login to improve performance
+    # Emails will be stored only when they are opened for viewing
+
     page = request.args.get('page', 1, type=int)
     per_page = 10
     offset = (page - 1) * per_page
 
+    # Get emails from Gmail API for now
+    # In a production app, we would retrieve from the database instead
     messages_refs = list_messages(service, max_results=100)
     total_messages = len(messages_refs) if messages_refs else 0
     total_pages = (total_messages + per_page - 1) // per_page
@@ -89,6 +99,9 @@ def dashboard():
                     'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A')
                 }
                 emails_data.append(email_info)
+
+    # Close database connection
+    gmail_db.close()
 
     return render_template('dashboard.html', emails=emails_data, current_page=page, total_pages=total_pages)
 
@@ -159,11 +172,37 @@ def api_email_detail(email_id):
     service = get_gmail_service(creds)
     if not service:
         return jsonify({'error': 'Could not connect to Gmail service'}), 500
-
-    msg_detail = get_message_detail(service, email_id, format='full')
-    if not msg_detail:
-        return jsonify({'error': 'Email not found'}), 404
-
+        
+    # Initialize database integration
+    gmail_db = GmailDBIntegration()
+    
+    # Try to get email from database first
+    # Check if we already have this email in the database
+    stored_email = None
+    try:
+        # Attempt to find the email in the database using Gmail message ID
+        stored_email = gmail_db.get_email_by_message_id(email_id)
+        if stored_email:
+            print(f"Email {email_id} found in database, using stored version")
+    except Exception as e:
+        print(f"Error checking for email in database: {e}")
+    
+    # If not in database, fetch from Gmail API and store it
+    if not stored_email:
+        msg_detail = get_message_detail(service, email_id, format='full')
+        if not msg_detail:
+            return jsonify({'error': 'Email not found'}), 404
+            
+        # Store email in database when it's viewed
+        try:
+            print(f"Storing email {email_id} in database on first view")
+            gmail_db.email_db.store_email(msg_detail)
+        except Exception as e:
+            print(f"Error storing email in database: {e}")
+    else:
+        # Use the stored email details
+        msg_detail = stored_email
+    
     headers = msg_detail.get('payload', {}).get('headers', [])
 
     body = ''
@@ -219,6 +258,125 @@ def api_email_detail(email_id):
     }
 
     return jsonify(email_data)
+
+@app.route('/api/email/<email_id>/summary')
+def api_email_summary(email_id):
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    # Initialize LLM component
+    email_understanding = EmailUnderstanding()
+    
+    try:
+        # Get summary from LLM
+        summary = email_understanding.summarize_email(email_id)
+        
+        # Close connections
+        email_understanding.close()
+        
+        return jsonify({
+            'email_id': email_id,
+            'summary': summary
+        })
+    except Exception as e:
+        email_understanding.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/thread/<thread_id>/summary')
+def api_thread_summary(thread_id):
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    # Initialize LLM component
+    email_understanding = EmailUnderstanding()
+    
+    try:
+        # Get thread summary from LLM
+        summary = email_understanding.summarize_thread(thread_id)
+        
+        # Close connections
+        email_understanding.close()
+        
+        return jsonify({
+            'thread_id': thread_id,
+            'summary': summary
+        })
+    except Exception as e:
+        email_understanding.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/<email_id>/draft-reply')
+def api_draft_reply(email_id):
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    # Initialize LLM component
+    email_understanding = EmailUnderstanding()
+    
+    try:
+        # Get draft reply from LLM
+        draft_reply = email_understanding.draft_reply(email_id)
+        
+        # Close connections
+        email_understanding.close()
+        
+        return jsonify({
+            'email_id': email_id,
+            'draft_reply': draft_reply
+        })
+    except Exception as e:
+        email_understanding.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/<email_id>/action-items')
+def api_action_items(email_id):
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    # Initialize LLM component
+    email_understanding = EmailUnderstanding()
+    
+    try:
+        # Get action items from LLM
+        action_items = email_understanding.extract_action_items(email_id)
+        
+        # Close connections
+        email_understanding.close()
+        
+        return jsonify({
+            'email_id': email_id,
+            'action_items': action_items
+        })
+    except Exception as e:
+        email_understanding.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/search/semantic')
+def api_semantic_search():
+    if 'credentials' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    query = request.args.get('q', '')
+    if not query:
+        return jsonify({'error': 'Query parameter is required'}), 400
+
+    # Initialize LLM component
+    email_understanding = EmailUnderstanding()
+    
+    try:
+        # Perform semantic search
+        results = email_understanding.search_semantic(query)
+        
+        # Close connections
+        email_understanding.close()
+        
+        return jsonify({
+            'query': query,
+            'results': results
+        })
+    except Exception as e:
+        email_understanding.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/archived_emails')
 def archived_emails():

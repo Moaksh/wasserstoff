@@ -1,8 +1,16 @@
 # requirements.txt
-Flask # Add Flask
+Flask
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 python-dotenv
-# requests # Might be needed by google-auth or useful later
-# SQLAlchemy # Add later for database``
+
+# Database and vector search
+SQLAlchemy
+faiss-cpu
+numpy
+openai
+sentence-transformers
+
+# For potential future use
+# requests
