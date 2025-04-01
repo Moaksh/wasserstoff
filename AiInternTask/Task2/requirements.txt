@@ -1,0 +1,7 @@
+python-dotenv
+playwright
+langchain
+langchain_openai
+openai
+beautifulsoup4
+tiktoken # Often needed by Langchain for text splitting/counting
