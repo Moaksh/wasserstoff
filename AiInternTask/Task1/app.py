@@ -199,63 +199,94 @@ def api_email_detail(email_id):
             gmail_db.email_db.store_email(msg_detail)
         except Exception as e:
             print(f"Error storing email in database: {e}")
-    else:
-        # Use the stored email details
-        msg_detail = stored_email
-    
-    headers = msg_detail.get('payload', {}).get('headers', [])
+            
+        headers = msg_detail.get('payload', {}).get('headers', [])
 
-    body = ''
-    html_body = ''
+        body = ''
+        html_body = ''
 
-    if 'parts' in msg_detail.get('payload', {}):
-        for part in msg_detail['payload']['parts']:
-            if part.get('mimeType') == 'text/html' and 'data' in part.get('body', {}):
-                body_data = part['body']['data']
-                html_body = base64.urlsafe_b64decode(body_data).decode('utf-8')
-                break
-
-        if not html_body:
+        if 'parts' in msg_detail.get('payload', {}):
             for part in msg_detail['payload']['parts']:
-                if part.get('mimeType') == 'text/plain' and 'data' in part.get('body', {}):
+                if part.get('mimeType') == 'text/html' and 'data' in part.get('body', {}):
                     body_data = part['body']['data']
-                    body = base64.urlsafe_b64decode(body_data).decode('utf-8')
+                    html_body = base64.urlsafe_b64decode(body_data).decode('utf-8')
                     break
-    elif 'body' in msg_detail.get('payload', {}) and 'data' in msg_detail['payload']['body']:
-        body_data = msg_detail['payload']['body']['data']
-        mime_type = msg_detail.get('payload', {}).get('mimeType', 'text/plain')
-        decoded_content = base64.urlsafe_b64decode(body_data).decode('utf-8')
 
-        if mime_type == 'text/html':
-            html_body = decoded_content
+            if not html_body:
+                for part in msg_detail['payload']['parts']:
+                    if part.get('mimeType') == 'text/plain' and 'data' in part.get('body', {}):
+                        body_data = part['body']['data']
+                        body = base64.urlsafe_b64decode(body_data).decode('utf-8')
+                        break
+        elif 'body' in msg_detail.get('payload', {}) and 'data' in msg_detail['payload']['body']:
+            body_data = msg_detail['payload']['body']['data']
+            mime_type = msg_detail.get('payload', {}).get('mimeType', 'text/plain')
+            decoded_content = base64.urlsafe_b64decode(body_data).decode('utf-8')
+
+            if mime_type == 'text/html':
+                html_body = decoded_content
+            else:
+                body = decoded_content
+
+        if html_body:
+            body = html_body
         else:
-            body = decoded_content
+            body = body.replace('\n', '<br>')
 
-    if html_body:
-        body = html_body
+        attachments = []
+        if 'parts' in msg_detail.get('payload', {}):
+            for part in msg_detail['payload']['parts']:
+                if 'filename' in part and part['filename']:
+                    attachments.append({
+                        'id': part['body'].get('attachmentId', ''),
+                        'filename': part['filename'],
+                        'mimeType': part.get('mimeType', 'application/octet-stream'),
+                        'size': part['body'].get('size', 0)
+                    })
+
+        email_data = {
+            'id': email_id,
+            'subject': next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'N/A'),
+            'from': next((h['value'] for h in headers if h['name'].lower() == 'from'), 'N/A'),
+            'to': next((h['value'] for h in headers if h['name'].lower() == 'to'), 'N/A'),
+            'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A'),
+            'body': body,
+            'attachments': attachments
+        }
     else:
-        body = body.replace('\n', '<br>')
-
-    attachments = []
-    if 'parts' in msg_detail.get('payload', {}):
-        for part in msg_detail['payload']['parts']:
-            if 'filename' in part and part['filename']:
-                attachments.append({
-                    'id': part['body'].get('attachmentId', ''),
-                    'filename': part['filename'],
-                    'mimeType': part.get('mimeType', 'application/octet-stream'),
-                    'size': part['body'].get('size', 0)
-                })
-
-    email_data = {
-        'id': email_id,
-        'subject': next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'N/A'),
-        'from': next((h['value'] for h in headers if h['name'].lower() == 'from'), 'N/A'),
-        'to': next((h['value'] for h in headers if h['name'].lower() == 'to'), 'N/A'),
-        'date': next((h['value'] for h in headers if h['name'].lower() == 'date'), 'N/A'),
-        'body': body,
-        'attachments': attachments
-    }
+        # Use the stored email from database
+        # The structure is different from Gmail API response
+        # Format sender information properly
+        sender_name = stored_email.get('sender_name', '')
+        sender_email = stored_email.get('sender_email', '')
+        if sender_name and sender_email:
+            from_field = f"{sender_name} <{sender_email}>"
+        elif sender_email:
+            from_field = sender_email
+        else:
+            from_field = 'N/A'
+            
+        # Format recipient information properly
+        to_recipients = stored_email.get('recipients', {}).get('to', [])
+        if to_recipients:
+            to_field = ', '.join([r.get('email') if not r.get('name') else f"{r.get('name')} <{r.get('email')}>" for r in to_recipients])
+        else:
+            to_field = 'N/A'
+            
+        email_data = {
+            'id': email_id,
+            'subject': stored_email.get('subject', 'N/A'),
+            'from': from_field,
+            'to': to_field,
+            'date': stored_email.get('timestamp', 'N/A'),
+            'body': stored_email.get('body_html', '') or stored_email.get('body_text', '').replace('\n', '<br>'),
+            'attachments': [{
+                'id': a.get('attachment_id', ''),
+                'filename': a.get('filename', ''),
+                'mimeType': a.get('content_type', 'application/octet-stream'),
+                'size': a.get('size', 0)
+            } for a in stored_email.get('attachments', [])]
+        }
 
     return jsonify(email_data)
 

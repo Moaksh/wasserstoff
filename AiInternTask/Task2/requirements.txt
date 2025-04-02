@@ -1,7 +1,7 @@
-python-dotenv
-playwright
-langchain
-langchain_openai
-openai
-beautifulsoup4
-tiktoken # Often needed by Langchain for text splitting/counting
+browser-use>=0.1.40
+langchain-google-genai>=2.0.0
+python-dotenv>=1.0.0
+tqdm>=4.65.0
+pydantic>=2.0.0
+markdownify>=0.11.6
+playwright>=1.30.0
