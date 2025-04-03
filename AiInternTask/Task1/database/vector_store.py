@@ -93,9 +93,25 @@ class VectorStore:
                     padding = np.zeros((embedding.shape[0], self.dimension - embedding.shape[1]), dtype=np.float32)
                     embedding = np.hstack((embedding, padding))
             
+            # Normalize the embedding to unit length to improve search quality
+            # This can help with numerical stability issues
+            norm = np.linalg.norm(embedding, axis=1, keepdims=True)
+            if norm.any():
+                embedding = embedding / norm
+            
             # Add to index
             index_id = self.index.ntotal
-            self.index.add(embedding)
+            try:
+                self.index.add(embedding)
+            except Exception as e:
+                print(f"FAISS error adding embedding for email {email_id}: {e}")
+                # Try to recover by creating a new index if the current one is corrupted
+                if "index not trained" in str(e).lower():
+                    print(f"Attempting to retrain index for email {email_id}")
+                    self.index = faiss.IndexFlatL2(self.dimension)
+                    self.index.add(embedding)
+                else:
+                    raise
             
             # Store metadata
             self.metadata['emails'][str(index_id)] = {
@@ -105,11 +121,18 @@ class VectorStore:
             }
             
             # Save index and metadata
-            self._save()
+            try:
+                self._save()
+            except Exception as e:
+                print(f"Error saving vector store after adding email {email_id}: {e}")
+                # Continue anyway since the email is in memory
+                # We'll try to save again on the next operation
             
             return index_id
         except Exception as e:
             print(f"Error adding email {email_id} to vector store: {e}")
+            import traceback
+            traceback.print_exc()
             # Return None instead of raising to prevent cascading failures
             return None
     
@@ -181,8 +204,27 @@ class VectorStore:
         """
         Save both the index and metadata to disk.
         """
-        self._save_index()
-        self._save_metadata()
+        try:
+            # Create a temporary file to avoid corruption if the process is interrupted
+            temp_index_path = f"{self.index_path}.temp"
+            temp_metadata_path = f"{self.metadata_path}.temp"
+            
+            # Save to temporary files first
+            faiss.write_index(self.index, temp_index_path)
+            with open(temp_metadata_path, 'w') as f:
+                json.dump(self.metadata, f, indent=2)
+                
+            # Rename temporary files to final files (atomic operation)
+            import os
+            os.replace(temp_index_path, self.index_path)
+            os.replace(temp_metadata_path, self.metadata_path)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving vector store: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def _save_index(self):
         """

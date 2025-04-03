@@ -32,6 +32,13 @@ class EmailStorage:
             thread_id = email_data.get('threadId')
             snippet = email_data.get('snippet', '')
             
+            # Check if email already exists in database
+            self.db.cursor.execute('SELECT id FROM emails WHERE message_id = ?', (message_id,))
+            existing_email = self.db.cursor.fetchone()
+            if existing_email:
+                print(f"Email with message_id {message_id} already exists in database with id {existing_email['id']}")
+                return existing_email['id']
+            
             # Get headers
             headers = email_data.get('payload', {}).get('headers', [])
             subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
@@ -68,7 +75,7 @@ class EmailStorage:
                 
                 # Store email
                 self.db.cursor.execute('''
-                INSERT OR IGNORE INTO emails 
+                INSERT INTO emails 
                 (message_id, thread_id, sender_id, subject, body_text, body_html, 
                 snippet, timestamp, in_reply_to, is_read, is_archived, is_deleted, raw_data) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -37,7 +37,16 @@ class EmailDB:
             Database ID of the stored email
         """
         try:
-            # Store in structured database
+            # Check if email already exists in database by message_id
+            message_id = email_data.get('id')
+            existing_email = self.email_storage.get_email_by_message_id(message_id)
+            
+            if existing_email:
+                print(f"Email with message_id {message_id} already exists in database, skipping storage")
+                # Return the existing email's database ID
+                return existing_email.get('id')
+                
+            # Store in structured database if it doesn't exist
             email_id = self.email_storage.store_email(email_data)
             
             # Get the stored email with all fields
